@@ -7,6 +7,7 @@
     password: "{{ password }}"
     insecure: true
   delegate_to: "{{ rhv_man }}"
+  run_once: true
 
 - name: Create VM from template
   ovirt_vms:
