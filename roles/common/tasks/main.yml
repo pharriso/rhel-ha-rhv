@@ -1,0 +1,48 @@
+---
+
+- name: Disable cloud-init
+  file:
+    path: /etc/cloud/cloud-init.disabled
+    state: touch
+
+- name: Stop Cloud init messing with DNS
+  file:
+    path: /etc/NetworkManager/conf.d/99-cloud-init.conf
+    state: absent
+
+- name: Bounce Network manager after disabling cloud init
+  systemd:
+    name: NetworkManager.service
+    state: restarted
+
+- name: Subscribe to RHN
+  redhat_subscription:
+    state: present
+    username: "{{ rhsm_user }}"
+    password: "{{ rhsm_password }}"
+    pool_ids: "{{ rhsm_pool }}"
+
+- name: Enable correct repos
+  shell: subscription-manager repos --disable="*" --enable=rhel-ha-for-rhel-7-server-rpms --enable=rhel-7-server-rpms
+
+- name: Yum update
+  yum:
+    name: "*"
+    state: latest
+  register: patches
+
+- name: Reboot server
+  shell: sleep 2 && reboot
+  async: 1
+  poll: 0
+  ignore_errors: true
+  when: patches | changed
+
+- name: Wait for server to come back
+  wait_for: 
+    host: "{{ inventory_hostname }}"
+    delay: 10 
+    timeout: 300 
+    port: 22
+  delegate_to: "{{ rhv_man }}"
+  when: patches | changed

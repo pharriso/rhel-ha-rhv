@@ -1,0 +1,51 @@
+---
+
+- name: Auth to RHV
+  ovirt_auth:
+    url: "{{ auth_url }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    insecure: true
+  delegate_to: "{{ rhv_man }}"
+
+- name: Create VM from template
+  ovirt_vms:
+    auth: "{{ ovirt_auth }}"
+    state: running
+    name: "{{ inventory_hostname }}"
+    template: "{{ vm_template }}"
+    cpu_cores: "{{ cpu_cores }}"
+    memory: "{{ memory }}"
+    cluster: "{{ cluster }}"
+    operating_system: rhel_7x64
+    cloud_init:
+      host_name: "{{ inventory_hostname }}"
+      custom_script: |
+        ssh_pwauth: True
+        runcmd: 
+          - echo nameserver {{ dns_server }} > /etc/resolv.conf
+      user_name: root
+      root_password: "{{ root_password }}"
+      dns_servers: "{{ dns_server }}"
+      dns_search: "{{ dns_search }}"
+      timezone: "Europe/London"
+    cloud_init_nics:
+      - nic_name: eth0
+        nic_boot_protocol: static
+        nic_ip_address: "{{ ansible_host }}"
+        nic_netmask: "{{ nic_netmask }}"
+        nic_gateway: "{{ nic_gateway }}"
+        nic_on_boot: true
+    nics:
+      - name: eth0
+        profile_name: "{{ nic_profile }}"
+    timeout: 30
+  delegate_to: "{{ rhv_man }}"
+
+- name: Wait for server to start
+  wait_for: 
+    host: "{{ inventory_hostname }}"
+    delay: 10 
+    timeout: 1200 
+    port: 22
+  delegate_to: "{{ rhv_man }}"
